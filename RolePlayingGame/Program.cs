@@ -1,8 +1,11 @@
 using AutoMapper;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using RolePlayingGame.Data;
 using RolePlayingGame.Profiles;
 using RolePlayingGame.Services.CharacterService;
+using System.Text;
 
 namespace RolePlayingGame
 {
@@ -30,6 +33,23 @@ namespace RolePlayingGame
             builder.Services.AddControllers();
             builder.Services.AddSingleton(mapper);
             builder.Services.AddScoped<ICharacterService, CharacterService>();
+            builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+            // for JWT authorization
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        IssuerSigningKey = new SymmetricSecurityKey(
+                            Encoding.ASCII.GetBytes(configuration.GetSection("JWT:Secret").Value)
+                        ),
+                        ValidateIssuerSigningKey = true,
+                        ValidateIssuer = false,
+                        ValidateAudience = false,
+                    };
+                });
+            // for getting the current user from request
+            builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             //builder.Services.AddEndpointsApiExplorer();
             //builder.Services.AddSwaggerGen();
@@ -45,8 +65,10 @@ namespace RolePlayingGame
 
             //app.UseHttpsRedirection();
 
-            app.UseAuthorization();
+            // order of UseAuthentication & UseAuthorization matters
+            app.UseAuthentication();
 
+            app.UseAuthorization();
 
             app.MapControllers();
 
